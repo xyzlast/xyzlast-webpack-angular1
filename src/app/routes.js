@@ -11,6 +11,7 @@ export default function routes($stateProvider) {
   }).state('user', {
     url: '/user',
     template: require('../public/user.html'),
-    controller: 'UserController'
+    controller: 'UserController',
+    controllerAs: 'ctn'
   });
-};
+}

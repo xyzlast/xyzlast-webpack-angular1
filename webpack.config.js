@@ -6,6 +6,7 @@ var autoprefixer = require('autoprefixer');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var CopyWebpackPlugin = require('copy-webpack-plugin');
+var path = require('path');
 
 /**
  * Env
@@ -21,7 +22,14 @@ module.exports = function makeWebpackConfig () {
    * Reference: http://webpack.github.io/docs/configuration.html
    * This is the object where all configuration gets set
    */
-  var config = {};
+  var config = {
+    resolve: {
+      extensions: [ '', '.js', 'min.js' ],
+      modulesDirectories: ['node_modules', 'bower_components',
+        path.join(__dirname, 'libs/kendo/src/js')
+      ]
+    }
+  };
 
   /**
    * Entry
@@ -31,7 +39,6 @@ module.exports = function makeWebpackConfig () {
    */
   config.entry = isTest ? {} : {
     app: './src/app/app.js'
-    // HomeController: './src/app/controllers/home.js'
   };
 
   /**
@@ -81,6 +88,12 @@ module.exports = function makeWebpackConfig () {
   config.module = {
     preLoaders: [],
     loaders: [{
+      test: /\/angular\.js$/,
+      loader: 'imports?jQuery=jquery'
+    }, {
+      test: /\/jquery.js$/,
+      loader: 'expose?jQuery'
+    }, {
       // JS LOADER
       // Reference: https://github.com/babel/babel-loader
       // Transpile .js files using babel-loader
@@ -135,7 +148,7 @@ module.exports = function makeWebpackConfig () {
         /\.spec\.js$/
       ],
       loader: 'isparta-instrumenter'
-    })
+    });
   }
 
   /**
@@ -156,8 +169,10 @@ module.exports = function makeWebpackConfig () {
    */
   config.plugins = [];
   config.plugins.push(new webpack.ProvidePlugin({
-    '_': 'lodash',
-    'Promise': 'bluebird'
+    'window._': 'lodash',
+    'window.Promise': 'bluebird',
+    'window.$': 'jquery',
+    'window.jQuery': 'jquery'
   }));
 
   // Skip rendering index.html in test mode
@@ -174,7 +189,7 @@ module.exports = function makeWebpackConfig () {
       // Extract css files
       // Disabled when in test mode or not in build mode
       new ExtractTextPlugin('[name].[hash].css', {disable: !isProd})
-    )
+    );
   }
 
   // Add build specific plugins
@@ -194,10 +209,8 @@ module.exports = function makeWebpackConfig () {
 
       // Copy assets from the public folder
       // Reference: https://github.com/kevlened/copy-webpack-plugin
-      new CopyWebpackPlugin([{
-        from: __dirname + '/src/public'
-      }])
-    )
+      new CopyWebpackPlugin([{ from: __dirname + '/src/public'}])
+    );
   }
 
   /**
@@ -209,6 +222,8 @@ module.exports = function makeWebpackConfig () {
     contentBase: './src/public',
     stats: 'minimal'
   };
+
+  console.log(config);
 
   return config;
 }();
