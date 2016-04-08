@@ -6,26 +6,30 @@ var autoprefixer = require('autoprefixer');
 var HtmlWebpackPlugin = require('html-webpack-plugin');
 var ExtractTextPlugin = require('extract-text-webpack-plugin');
 var CopyWebpackPlugin = require('copy-webpack-plugin');
+var CleanWebpackPlugin = require('clean-webpack-plugin');
 var path = require('path');
 
-/**
- * Env
- * Get npm lifecycle event to identify the environment
- */
-var ENV = process.env.npm_lifecycle_event;
-var isTest = ENV === 'test' || ENV === 'test-watch';
-var isProd = ENV === 'build';
+function buildConfig() {
+  let isProd = false;
+  process.argv.forEach(arg => {
+    if (!isProd) {
+      isProd = arg.toLowerCase() === '--production';
+    }
+  });
+  const isTest = false;
+  console.log('== build mode ==');
+  console.log('isProd: ' + isProd.toString());
+  console.log('isTest: ' + isTest.toString());
 
-module.exports = function makeWebpackConfig () {
   /**
    * Config
    * Reference: http://webpack.github.io/docs/configuration.html
-   * This is the object where all configuration gets set
    */
   var config = {
     resolve: {
       extensions: [ '', '.js', 'min.js' ],
-      modulesDirectories: ['node_modules', 'bower_components',
+      modulesDirectories: [
+        'node_modules',
         path.join(__dirname, 'libs/kendo/src/js')
       ]
     }
@@ -34,8 +38,6 @@ module.exports = function makeWebpackConfig () {
   /**
    * Entry
    * Reference: http://webpack.github.io/docs/configuration.html#entry
-   * Should be an empty object if it's generating a test build
-   * Karma will set this when it's a test build
    */
   config.entry = isTest ? {} : {
     app: './src/app/app.js'
@@ -44,8 +46,6 @@ module.exports = function makeWebpackConfig () {
   /**
    * Output
    * Reference: http://webpack.github.io/docs/configuration.html#output
-   * Should be an empty object if it's generating a test build
-   * Karma will handle setting it up for you when it's a test build
    */
   config.output = isTest ? {} : {
     // Absolute output directory
@@ -80,8 +80,6 @@ module.exports = function makeWebpackConfig () {
   /**
    * Loaders
    * Reference: http://webpack.github.io/docs/configuration.html#module-loaders
-   * List: http://webpack.github.io/docs/list-of-loaders.html
-   * This handles most of the magic responsible for converting modules
    */
 
   // Initialize module
@@ -94,10 +92,6 @@ module.exports = function makeWebpackConfig () {
       test: /\/jquery.js$/,
       loader: 'expose?jQuery'
     }, {
-      // JS LOADER
-      // Reference: https://github.com/babel/babel-loader
-      // Transpile .js files using babel-loader
-      // Compiles ES6 and ES7 into ES5 code
       test: /\.js$/,
       loader: 'babel',
       query: {
@@ -106,39 +100,21 @@ module.exports = function makeWebpackConfig () {
       exclude: /node_modules/
     }, {
       // CSS LOADER
-      // Reference: https://github.com/webpack/css-loader
-      // Allow loading css through js
-      //
-      // Reference: https://github.com/postcss/postcss-loader
-      // Postprocess your css with PostCSS plugins
       test: /\.css$/,
-      // Reference: https://github.com/webpack/extract-text-webpack-plugin
-      // Extract css files in production builds
-      //
-      // Reference: https://github.com/webpack/style-loader
-      // Use style-loader in development.
-      loader: isTest ? 'null' : ExtractTextPlugin.extract('style', 'css?sourceMap!postcss')
+      loader: ExtractTextPlugin.extract('style', 'css?sourceMap!postcss')
     }, {
       // ASSET LOADER
       // Reference: https://github.com/webpack/file-loader
-      // Copy png, jpg, jpeg, gif, svg, woff, woff2, ttf, eot files to output
-      // Rename the file using the asset hash
-      // Pass along the updated reference to your code
-      // You can add here any file extension you want to get copied to your output
       test: /\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot)$/,
       loader: 'file'
     }, {
       // HTML LOADER
       // Reference: https://github.com/webpack/raw-loader
-      // Allow loading html through js
       test: /\.html$/,
       loader: 'raw'
     }]
   };
 
-  // ISPARTA LOADER
-  // Reference: https://github.com/ColCh/isparta-instrumenter-loader
-  // Instrument JS files with Isparta for subsequent code coverage reporting
   // Skips node_modules and files that end with .test.js
   if (isTest) {
     config.module.preLoaders.push({
@@ -168,6 +144,8 @@ module.exports = function makeWebpackConfig () {
    * List: http://webpack.github.io/docs/list-of-plugins.html
    */
   config.plugins = [];
+
+  // Default Libraries (Promise, jQuery, lodash)
   config.plugins.push(new webpack.ProvidePlugin({
     'window._': 'lodash',
     'window.Promise': 'bluebird',
@@ -176,7 +154,14 @@ module.exports = function makeWebpackConfig () {
   }));
 
   // Skip rendering index.html in test mode
-  if (!isTest) {
+  if (isProd) {
+    // Clean Old files
+    config.plugins.push(
+      new CleanWebpackPlugin(['dist', 'build'], {
+        verbose: true,
+        dry: false
+      })
+    );
     // Reference: https://github.com/ampedandwired/html-webpack-plugin
     // Render index.html
     config.plugins.push(
@@ -190,40 +175,19 @@ module.exports = function makeWebpackConfig () {
       // Disabled when in test mode or not in build mode
       new ExtractTextPlugin('[name].[hash].css', {disable: !isProd})
     );
-  }
-
-  // Add build specific plugins
-  if (isProd) {
     config.plugins.push(
-      // Reference: http://webpack.github.io/docs/list-of-plugins.html#noerrorsplugin
-      // Only emit files when there are no errors
       new webpack.NoErrorsPlugin(),
-
-      // Reference: http://webpack.github.io/docs/list-of-plugins.html#dedupeplugin
-      // Dedupe modules in the output
       new webpack.optimize.DedupePlugin(),
-
-      // Reference: http://webpack.github.io/docs/list-of-plugins.html#uglifyjsplugin
-      // Minify all javascript, switch loaders to minimizing mode
-      new webpack.optimize.UglifyJsPlugin(),
-
-      // Copy assets from the public folder
-      // Reference: https://github.com/kevlened/copy-webpack-plugin
+      // new webpack.optimize.UglifyJsPlugin(),
       new CopyWebpackPlugin([{ from: __dirname + '/src/public'}])
     );
   }
 
-  /**
-   * Dev server configuration
-   * Reference: http://webpack.github.io/docs/configuration.html#devserver
-   * Reference: http://webpack.github.io/docs/webpack-dev-server.html
-   */
   config.devServer = {
     contentBase: './src/public',
     stats: 'minimal'
   };
-
-  console.log(config);
-
   return config;
-}();
+}
+
+module.exports = buildConfig();

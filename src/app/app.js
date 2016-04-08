@@ -10,6 +10,9 @@ import routing from './routes';
 import uirouter from 'angular-ui-router';
 
 import restangular from 'restangular-umd';
+// import restangular from 'restangular';
+console.log(restangular);
+
 import homeController from './controllers/home';
 import userController from './controllers/user';
 
